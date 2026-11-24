@@ -44,6 +44,41 @@ describe('ItemForm — report mode (/items/new)', () => {
     expect(category).toHaveValue('other')
   })
 
-  test.todo('submitting POSTs { title, status, category, location, description } (no reportedBy) and navigates to /items')
-  test.todo('shows the server\'s message when the request fails (e.g. 409) and stays on the page')
+  test('submitting POSTs { title, status, category, location, description } (no reportedBy) and navigates to /items', async () => {
+    const user = userEvent.setup()
+    api.post.mockResolvedValue({ data: { item: {} } })
+    renderAt('/items/new')
+
+    await user.type(screen.getByPlaceholderText(/title/i), 'Black backpack')
+    const [status, category] = screen.getAllByRole('combobox')
+    await user.selectOptions(status, 'found')
+    await user.selectOptions(category, 'accessories')
+    await user.type(screen.getByPlaceholderText(/location/i), 'Library')
+    await user.type(screen.getByPlaceholderText(/description/i), 'Near the entrance')
+    await user.click(screen.getByRole('button', { name: /save/i }))
+
+    expect(api.post).toHaveBeenCalledWith('/items', {
+      title: 'Black backpack',
+      status: 'found',
+      category: 'accessories',
+      location: 'Library',
+      description: 'Near the entrance'
+    })
+    expect(await screen.findByText('Items page')).toBeInTheDocument()
+  })
+
+  test('shows the server\'s message when the request fails (e.g. 409) and stays on the page', async () => {
+    const user = userEvent.setup()
+    api.post.mockRejectedValue({
+      response: { status: 409, data: { message: 'Duplicate item at this location' } }
+    })
+    renderAt('/items/new')
+
+    await user.type(screen.getByPlaceholderText(/title/i), 'Black backpack')
+    await user.click(screen.getByRole('button', { name: /save/i }))
+
+    expect(await screen.findByText('Duplicate item at this location')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /report item/i })).toBeInTheDocument()
+    expect(screen.queryByText('Items page')).not.toBeInTheDocument()
+  })
 })
